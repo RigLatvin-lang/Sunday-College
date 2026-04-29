@@ -81,7 +81,7 @@ fun LoginScreen(
                 color = TextPrimary
             )
             Text(
-                text = "Вход для преподавателя и родителя",
+                text = "Вход для преподавателя, родителя и студента",
                 fontSize = 13.sp,
                 color = TextMuted,
                 modifier = Modifier.padding(top = 4.dp)

@@ -48,6 +48,8 @@ export interface TeacherResponse {
 
 export interface StudentResponse {
 	id: number
+	userId?: number
+	login?: string
 	lastName: string
 	firstName: string
 	middleName?: string
@@ -57,6 +59,19 @@ export interface StudentResponse {
 }
 
 export interface CreateStudentRequest {
+	login: string
+	password: string
+	lastName: string
+	firstName: string
+	middleName?: string
+	birthDate?: string
+	inn?: string
+	phone?: string
+}
+
+export interface UpdateStudentRequest {
+	login?: string
+	password?: string
 	lastName: string
 	firstName: string
 	middleName?: string

@@ -80,5 +80,6 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
 private fun String.toAppRole(): AppRole? = when (uppercase()) {
     "TEACHER" -> AppRole.TEACHER
     "PARENT" -> AppRole.PARENT
+    "STUDENT" -> AppRole.STUDENT
     else -> null
 }

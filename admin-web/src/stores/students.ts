@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { studentsApi } from '@/api/students'
-import type { StudentResponse, CreateStudentRequest } from '@/types'
+import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest } from '@/types'
 
 export const useStudentsStore = defineStore('students', () => {
   const items = ref<StudentResponse[]>([])
@@ -22,7 +22,7 @@ export const useStudentsStore = defineStore('students', () => {
     await fetchAll()
   }
 
-  async function update(id: number, payload: CreateStudentRequest) {
+  async function update(id: number, payload: UpdateStudentRequest) {
     await studentsApi.update(id, payload)
     await fetchAll()
   }

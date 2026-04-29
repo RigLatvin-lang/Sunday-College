@@ -5,6 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class StudentResponse(
     val id: Long,
+    val userId: Long? = null,
+    val login: String? = null,
     val lastName: String,
     val firstName: String,
     val middleName: String? = null,

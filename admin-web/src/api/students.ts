@@ -1,5 +1,5 @@
 import api from './axios'
-import type { StudentResponse, CreateStudentRequest } from '@/types'
+import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest } from '@/types'
 
 export const studentsApi = {
   getAll() {
@@ -11,7 +11,7 @@ export const studentsApi = {
   create(data: CreateStudentRequest) {
     return api.post<StudentResponse>('/students', data)
   },
-  update(id: number, data: CreateStudentRequest) {
+  update(id: number, data: UpdateStudentRequest) {
     return api.put<StudentResponse>(`/students/${id}`, data)
   },
   delete(id: number) {

@@ -3,10 +3,14 @@ package aur.diploma.kmp.data.remote
 import android.content.Context
 import android.content.SharedPreferences
 
-private var appContext: Context? = null
+internal var appContext: Context? = null
 
 fun initTokenStorage(context: Context) {
     appContext = context.applicationContext
+}
+
+internal fun requireAppContext(): Context {
+    return checkNotNull(appContext) { "Android application context is not initialized" }
 }
 
 actual class TokenStorage actual constructor() {

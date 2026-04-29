@@ -15,6 +15,12 @@ object LessonsRoute
 object ParentLessonsRoute
 
 @Serializable
+object StudentLessonsRoute
+
+@Serializable
+object StudentStatsRoute
+
+@Serializable
 data class AttendanceRoute(val lessonId: Long)
 
 @Serializable

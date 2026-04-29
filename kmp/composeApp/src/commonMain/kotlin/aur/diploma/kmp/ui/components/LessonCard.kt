@@ -36,7 +36,7 @@ import aur.diploma.kmp.util.formatTime
 @Composable
 fun LessonCard(
     lesson: LessonResponse,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -45,9 +45,15 @@ fun LessonCard(
             .shadow(4.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp))
             .background(Surface)
-            .clickable(onClick = onClick)
             .padding(18.dp)
             .height(IntrinsicSize.Min)
+            .let { currentModifier ->
+                if (onClick != null) {
+                    currentModifier.clickable(onClick = onClick)
+                } else {
+                    currentModifier
+                }
+            }
     ) {
         Column(
             verticalArrangement = Arrangement.Center

@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import aur.diploma.kmp.notifications.ParentAttendanceMonitor
 import aur.diploma.kmp.ui.navigation.AppRole
 import aur.diploma.kmp.ui.navigation.AttendanceRoute
 import aur.diploma.kmp.ui.navigation.LessonsRoute
@@ -17,6 +18,8 @@ import aur.diploma.kmp.ui.navigation.LoginRoute
 import aur.diploma.kmp.ui.navigation.ParentLessonsRoute
 import aur.diploma.kmp.ui.navigation.ParentStudentProfileRoute
 import aur.diploma.kmp.ui.navigation.ScheduleRoute
+import aur.diploma.kmp.ui.navigation.StudentLessonsRoute
+import aur.diploma.kmp.ui.navigation.StudentStatsRoute
 import aur.diploma.kmp.ui.navigation.StudentProfileRoute
 import aur.diploma.kmp.ui.screens.attendance.AttendanceScreen
 import aur.diploma.kmp.ui.screens.attendance.AttendanceViewModel
@@ -30,10 +33,15 @@ import aur.diploma.kmp.ui.screens.parent.ParentStudentProfileScreen
 import aur.diploma.kmp.ui.screens.parent.ParentStudentProfileViewModel
 import aur.diploma.kmp.ui.screens.schedule.ScheduleScreen
 import aur.diploma.kmp.ui.screens.schedule.ScheduleViewModel
+import aur.diploma.kmp.ui.screens.student.StudentLessonsScreen
+import aur.diploma.kmp.ui.screens.student.StudentLessonsViewModel
+import aur.diploma.kmp.ui.screens.student.StudentStatsScreen
+import aur.diploma.kmp.ui.screens.student.StudentStatsViewModel
 import aur.diploma.kmp.ui.screens.studentprofile.StudentProfileScreen
 import aur.diploma.kmp.ui.screens.studentprofile.StudentProfileViewModel
 import aur.diploma.kmp.ui.theme.AppTheme
 import org.koin.compose.KoinContext
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -43,11 +51,15 @@ fun App() {
         AppTheme {
             val navController = rememberNavController()
             val loginViewModel: LoginViewModel = koinViewModel()
+            val parentAttendanceMonitor: ParentAttendanceMonitor = koinInject()
             var isStartResolved by remember { mutableStateOf(false) }
+            var currentRole by remember { mutableStateOf<AppRole?>(null) }
 
             LaunchedEffect(Unit) {
                 if (loginViewModel.isLoggedIn) {
-                    when (loginViewModel.restoreRole()) {
+                    val restoredRole = loginViewModel.restoreRole()
+                    currentRole = restoredRole
+                    when (restoredRole) {
                         AppRole.TEACHER -> {
                             navController.navigate(LessonsRoute) {
                                 popUpTo(LoginRoute) { inclusive = true }
@@ -58,10 +70,23 @@ fun App() {
                                 popUpTo(LoginRoute) { inclusive = true }
                             }
                         }
+                        AppRole.STUDENT -> {
+                            navController.navigate(StudentLessonsRoute) {
+                                popUpTo(LoginRoute) { inclusive = true }
+                            }
+                        }
                         null -> Unit
                     }
                 }
                 isStartResolved = true
+            }
+
+            LaunchedEffect(currentRole) {
+                if (currentRole == AppRole.PARENT) {
+                    parentAttendanceMonitor.start()
+                } else {
+                    parentAttendanceMonitor.stop()
+                }
             }
 
             if (!isStartResolved) {
@@ -76,6 +101,7 @@ fun App() {
                     LoginScreen(
                         viewModel = loginViewModel,
                         onLoginSuccess = { appRole ->
+                            currentRole = appRole
                             when (appRole) {
                                 AppRole.TEACHER -> {
                                     navController.navigate(LessonsRoute) {
@@ -84,6 +110,11 @@ fun App() {
                                 }
                                 AppRole.PARENT -> {
                                     navController.navigate(ParentLessonsRoute) {
+                                        popUpTo(LoginRoute) { inclusive = true }
+                                    }
+                                }
+                                AppRole.STUDENT -> {
+                                    navController.navigate(StudentLessonsRoute) {
                                         popUpTo(LoginRoute) { inclusive = true }
                                     }
                                 }
@@ -112,6 +143,7 @@ fun App() {
                             navController.navigate(AttendanceRoute(lessonId))
                         },
                         onLogout = {
+                            currentRole = null
                             loginViewModel.logout()
                             navController.navigate(LoginRoute) {
                                 popUpTo(LessonsRoute) { inclusive = true }
@@ -128,11 +160,37 @@ fun App() {
                             navController.navigate(ParentStudentProfileRoute)
                         },
                         onLogout = {
+                            currentRole = null
                             loginViewModel.logout()
                             navController.navigate(LoginRoute) {
                                 popUpTo(ParentLessonsRoute) { inclusive = true }
                             }
                         }
+                    )
+                }
+
+                composable<StudentLessonsRoute> {
+                    val viewModel: StudentLessonsViewModel = koinViewModel()
+                    StudentLessonsScreen(
+                        viewModel = viewModel,
+                        onStatsClick = {
+                            navController.navigate(StudentStatsRoute)
+                        },
+                        onLogout = {
+                            currentRole = null
+                            loginViewModel.logout()
+                            navController.navigate(LoginRoute) {
+                                popUpTo(StudentLessonsRoute) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                composable<StudentStatsRoute> {
+                    val viewModel: StudentStatsViewModel = koinViewModel()
+                    StudentStatsScreen(
+                        viewModel = viewModel,
+                        onBack = { navController.popBackStack() }
                     )
                 }
 
