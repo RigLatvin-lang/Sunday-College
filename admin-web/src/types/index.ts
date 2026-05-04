@@ -160,3 +160,13 @@ export interface CreateParentRequest {
 	phone?: string
 	studentId: number
 }
+
+export interface StudentImportError {
+	lineNumber: number
+	reason: string
+}
+
+export interface StudentImportResult {
+	created: StudentResponse[]
+	errors: StudentImportError[]
+}

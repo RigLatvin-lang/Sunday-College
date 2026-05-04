@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useStudentsStore } from '@/stores/students'
-import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest } from '@/types'
+import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest, StudentImportResult, StudentImportError } from '@/types'
 
 const store = useStudentsStore()
 const showModal = ref(false)
@@ -11,7 +11,65 @@ const submitting = ref(false)
 const formError = ref<string | null>(null)
 const showPassword = ref(false)
 
-// Форма создания
+// ─── CSV Import ──────────────────────────────────────────────────────────────
+const showImportModal = ref(false)
+const importFile = ref<File | null>(null)
+const importDragging = ref(false)
+const importUploading = ref(false)
+const importResult = ref<StudentImportResult | null>(null)
+const importError = ref<string | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function openImportModal() {
+  importFile.value = null
+  importResult.value = null
+  importError.value = null
+  importDragging.value = false
+  showImportModal.value = true
+}
+
+function onFileDrop(e: DragEvent) {
+  importDragging.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (file && file.name.endsWith('.csv')) {
+    importFile.value = file
+    importError.value = null
+  } else {
+    importError.value = 'Пожалуйста, загрузите файл в формате .csv'
+  }
+}
+
+function onFileInput(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) {
+    importFile.value = file
+    importError.value = null
+    importResult.value = null
+  }
+}
+
+async function handleImport() {
+  if (!importFile.value) return
+  importUploading.value = true
+  importError.value = null
+  importResult.value = null
+  try {
+    importResult.value = await store.importFromCsv(importFile.value)
+  } catch (e: any) {
+    importError.value = e?.response?.data?.error ?? 'Ошибка при загрузке файла'
+  } finally {
+    importUploading.value = false
+  }
+}
+
+function closeImportModal() {
+  showImportModal.value = false
+  importFile.value = null
+  importResult.value = null
+  importError.value = null
+}
+
+// ─── Форма создания ──────────────────────────────────────────────────────────
 const createForm = ref<CreateStudentRequest>({
   login: '',
   password: '',
@@ -134,6 +192,10 @@ function formatDate(d?: string) {
   <div class="page">
     <div class="page-header">
       <input v-model="search" class="search-input" placeholder="Поиск по имени, логину, телефону…" />
+      <button class="btn-outline-primary" @click="openImportModal">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Загрузить CSV
+      </button>
       <button class="btn-primary" @click="openCreate">+ Новый студент</button>
     </div>
 
@@ -181,7 +243,7 @@ function formatDate(d?: string) {
       <div v-else-if="!filtered.length" class="empty-state">Нет студентов</div>
     </div>
 
-    <!-- МОДАЛКА -->
+    <!-- МОДАЛКА РУЧНОГО СОЗДАНИЯ/РЕДАКТИРОВАНИЯ -->
     <Teleport to="body">
       <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
         <div class="modal" @click.stop>
@@ -286,6 +348,110 @@ function formatDate(d?: string) {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </Teleport>
+    <!-- МОДАЛКА CSV ИМПОРТА -->
+    <Teleport to="body">
+      <div v-if="showImportModal" class="modal-overlay" @click.self="closeImportModal">
+        <div class="modal modal-import" @click.stop>
+          <div class="modal-import-header">
+            <h2>Импорт студентов из CSV</h2>
+            <button class="modal-close" @click="closeImportModal">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <!-- Формат файла -->
+          <div class="csv-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>Ожидаемый формат: <code>login,password,lastName,firstName,middleName,birthDate,inn,phone</code></span>
+          </div>
+
+          <!-- Зона перетаскивания / выбора файла -->
+          <div
+            v-if="!importResult"
+            class="drop-zone"
+            :class="{ 'drop-zone--over': importDragging, 'drop-zone--ready': !!importFile }"
+            @dragover.prevent="importDragging = true"
+            @dragleave.prevent="importDragging = false"
+            @drop.prevent="onFileDrop"
+            @click="fileInputRef?.click()"
+          >
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".csv"
+              class="file-input-hidden"
+              @change="onFileInput"
+            />
+            <template v-if="!importFile">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="drop-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p class="drop-text">Перетащите CSV-файл сюда<br /><span>или нажмите для выбора</span></p>
+            </template>
+            <template v-else>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="drop-icon drop-icon--ready"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <p class="drop-text drop-file-name">{{ importFile.name }}<br /><span>{{ (importFile.size / 1024).toFixed(1) }} KB · Нажмите для замены</span></p>
+            </template>
+          </div>
+
+          <!-- Ошибка загрузки -->
+          <div v-if="importError" class="form-error">{{ importError }}</div>
+
+          <!-- Результат импорта -->
+          <div v-if="importResult" class="import-result">
+            <div class="import-summary">
+              <div class="summary-badge summary-badge--success">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Создано: {{ importResult.created.length }}
+              </div>
+              <div v-if="importResult.errors.length" class="summary-badge summary-badge--error">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Ошибок: {{ importResult.errors.length }}
+              </div>
+            </div>
+
+            <div v-if="importResult.errors.length" class="errors-table-wrap">
+              <p class="errors-label">Строки с ошибками:</p>
+              <table class="errors-table">
+                <thead>
+                  <tr><th>Строка</th><th>Причина</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="err in importResult.errors" :key="err.lineNumber">
+                    <td class="err-line">{{ err.lineNumber === 0 ? 'файл' : err.lineNumber }}</td>
+                    <td>{{ err.reason }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="importResult.errors.length === 0" class="import-all-ok">
+              Все строки успешно обработаны 🎉
+            </div>
+          </div>
+
+          <!-- Кнопки -->
+          <div class="modal-actions">
+            <button class="btn-secondary" @click="closeImportModal">
+              {{ importResult ? 'Закрыть' : 'Отмена' }}
+            </button>
+            <button
+              v-if="!importResult"
+              class="btn-primary"
+              :disabled="!importFile || importUploading"
+              @click="handleImport"
+            >
+              {{ importUploading ? 'Загрузка…' : 'Импортировать' }}
+            </button>
+            <button
+              v-else
+              class="btn-outline-primary"
+              @click="() => { importResult = null; importFile = null }"
+            >
+              Загрузить ещё
+            </button>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -422,4 +588,119 @@ function formatDate(d?: string) {
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
 .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.9rem; }
+
+/* ── CSV Import Button ────────────────────────────────── */
+.btn-outline-primary {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px 18px;
+  background: transparent;
+  color: var(--primary); border: 1.5px solid var(--primary);
+  border-radius: var(--radius); font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; transition: all var(--transition); white-space: nowrap;
+}
+.btn-outline-primary:hover {
+  background: var(--primary-50);
+  box-shadow: 0 0 0 3px var(--primary-200);
+}
+.btn-outline-primary:active { transform: scale(0.97); }
+
+/* ── Import Modal ─────────────────────────────────────── */
+.modal-import { max-width: 580px; }
+
+.modal-import-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.modal-import-header h2 { margin: 0; }
+
+.modal-close {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px; display: flex; align-items: center;
+  border-radius: var(--radius-sm); transition: all var(--transition);
+}
+.modal-close:hover { color: var(--danger); background: rgba(239,68,68,0.07); }
+
+.csv-hint {
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--bg-input); border: 1px solid var(--border-light);
+  border-radius: var(--radius); padding: 10px 14px;
+  font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 18px;
+}
+.csv-hint code {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+  color: var(--primary); background: var(--primary-50);
+  padding: 1px 4px; border-radius: 3px;
+}
+.csv-hint svg { flex-shrink: 0; margin-top: 1px; color: var(--primary); }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  cursor: pointer; transition: all var(--transition);
+  background: var(--bg-input); margin-bottom: 18px; position: relative;
+}
+.drop-zone:hover, .drop-zone--over {
+  border-color: var(--primary);
+  background: var(--primary-50);
+}
+.drop-zone--ready {
+  border-color: var(--primary); border-style: solid;
+  background: var(--primary-50);
+}
+.file-input-hidden {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.drop-icon { color: var(--text-muted); }
+.drop-icon--ready { color: var(--primary); }
+.drop-text {
+  text-align: center; font-size: 0.9rem; color: var(--text-secondary);
+  margin: 0; line-height: 1.5;
+}
+.drop-text span { font-size: 0.8rem; color: var(--text-muted); }
+.drop-file-name { color: var(--primary); font-weight: 600; }
+
+/* Import result */
+.import-result { margin-bottom: 18px; }
+
+.import-summary {
+  display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+}
+.summary-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 20px;
+  font-size: 0.875rem; font-weight: 600;
+}
+.summary-badge--success {
+  background: rgba(34,197,94,0.1); color: #16a34a;
+  border: 1px solid rgba(34,197,94,0.25);
+}
+.summary-badge--error {
+  background: rgba(239,68,68,0.08); color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+
+.errors-label {
+  font-size: 0.78rem; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+}
+.errors-table-wrap { max-height: 220px; overflow-y: auto; border-radius: var(--radius); border: 1px solid var(--border-light); }
+.errors-table { width: 100%; border-collapse: collapse; font-size: 0.825rem; }
+.errors-table th {
+  text-align: left; padding: 9px 14px; background: var(--bg-input);
+  color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.4px; border-bottom: 1px solid var(--border-light);
+  position: sticky; top: 0;
+}
+.errors-table td { padding: 9px 14px; border-bottom: 1px solid var(--border-light); color: var(--text-secondary); }
+.errors-table tr:last-child td { border-bottom: none; }
+.err-line { font-weight: 700; color: var(--danger); width: 60px; }
+
+.import-all-ok {
+  text-align: center; padding: 24px;
+  background: rgba(34,197,94,0.07); border: 1px solid rgba(34,197,94,0.2);
+  border-radius: var(--radius); color: #15803d; font-weight: 500; font-size: 0.9rem;
+}
 </style>

@@ -1,5 +1,5 @@
 import api from './axios'
-import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest } from '@/types'
+import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest, StudentImportResult } from '@/types'
 
 export const studentsApi = {
   getAll() {
@@ -16,5 +16,12 @@ export const studentsApi = {
   },
   delete(id: number) {
     return api.delete(`/students/${id}`)
+  },
+  importFromCsv(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post<StudentImportResult>('/students/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
   },
 }

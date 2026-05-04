@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { studentsApi } from '@/api/students'
-import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest } from '@/types'
+import type { StudentResponse, CreateStudentRequest, UpdateStudentRequest, StudentImportResult } from '@/types'
 
 export const useStudentsStore = defineStore('students', () => {
   const items = ref<StudentResponse[]>([])
@@ -32,5 +32,11 @@ export const useStudentsStore = defineStore('students', () => {
     await fetchAll()
   }
 
-  return { items, loading, fetchAll, create, update, remove }
+  async function importFromCsv(file: File): Promise<StudentImportResult> {
+    const { data } = await studentsApi.importFromCsv(file)
+    if (data.created.length > 0) await fetchAll()
+    return data
+  }
+
+  return { items, loading, fetchAll, create, update, remove, importFromCsv }
 })
