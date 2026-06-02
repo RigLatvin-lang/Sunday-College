@@ -1,4 +1,4 @@
-# Logs
+# Логи
 logs
 *.log
 npm-debug.log*
@@ -7,10 +7,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Зависимости и сборка
 node_modules
 dist
 dist-ssr
+.vite/
+
+# Окружение
 *.local
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
